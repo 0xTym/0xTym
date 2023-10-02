@@ -1,0 +1,3 @@
+- 0xTym
+- Learning C#, C++, HTML
+- DC: tym.wav
