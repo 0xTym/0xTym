@@ -1,4 +1,4 @@
-### Hi there, I'm [Your Name] 👋
+### Hi there, I'm Tym 👋
 
 ![Profile Views](https://komarev.com/ghpvc/?username=your-username&color=blue)
 
@@ -8,24 +8,23 @@
 
 - 💻 **Tech Stack:** PHP (Yii Framework), JavaScript, HTML, CSS, C++, C#, Python
 - 🌍 **Open Source Contributor**
-- 📫 How to reach me: [your-email@example.com](mailto:your-email@example.com)
+- 📫 How to reach me: [vraquz@icloud.com](mailto:vraquz@icloud.com)
 
 ---
 
 ## 📊 GitHub Stats
 
-![GitHub Streak](https://streak-stats.demolab.com/?user=your-username&theme=dark&hide_border=true)
+![GitHub Streak](https://streak-stats.demolab.com/?user=0xTym&theme=dark&hide_border=true)
 
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=your-username&show_icons=true&theme=dark)
+![GitHub Stats](https://github-readme-stats.vercel.app/api?username=0xTym&show_icons=true&theme=dark)
 
-![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=your-username&layout=compact&theme=dark)
+![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?0xTym=your-username&layout=compact&theme=dark)
 
 ---
 
 ## 🌟 Projects
 
-- [Project 1](https://github.com/your-username/project1) - A brief description of your project.
-- [Project 2](https://github.com/your-username/project2) - Another cool project description.
+ToDo
 
 ---
 
