@@ -46,9 +46,12 @@ This repository now includes a simple self-hosted license key system built with 
    ```bash
    pip install Flask Werkzeug
    ```
-2. Run the server:
+2. Set optional environment variables:
+   - `SECRET_KEY` for the Flask session secret
+   - `KEYAUTH_DB` to specify the SQLite database path
+3. Run the server:
    ```bash
    python keyauth/server.py
    ```
-3. Visit `http://localhost:5000/login` and login with the default credentials `admin` / `admin`.
-4. Generate or deactivate keys from the admin panel. Use the `/api/verify` endpoint to validate keys from your application.
+4. Visit `http://localhost:5000/login` and login with the default credentials `admin` / `admin`.
+5. Generate or deactivate keys from the admin panel. You can also create a random key with the **Generate Random Key** button. Use the `/api/verify` endpoint to validate keys from your application.

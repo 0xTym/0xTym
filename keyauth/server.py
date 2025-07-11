@@ -1,11 +1,13 @@
 from flask import Flask, request, redirect, render_template, session, url_for
+import os
 import sqlite3
+import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'change_me'
-DATABASE = 'keyauth.db'
+app.secret_key = os.environ.get('SECRET_KEY', 'change_me')
+DATABASE = os.environ.get('KEYAUTH_DB', 'keyauth.db')
 
 
 def get_db():
@@ -93,6 +95,7 @@ def logout():
 def admin():
     conn = get_db()
     c = conn.cursor()
+    generated_key = None
     if request.method == 'POST':
         new_key = request.form.get('new_key')
         if new_key:
@@ -101,13 +104,17 @@ def admin():
                 conn.commit()
             except sqlite3.IntegrityError:
                 pass
+        if 'generate' in request.form:
+            generated_key = secrets.token_urlsafe(32)
+            c.execute("INSERT INTO keys (key) VALUES (?)", (generated_key,))
+            conn.commit()
         for key_id in request.form.getlist('deactivate'):
             c.execute("UPDATE keys SET active=0 WHERE id=?", (key_id,))
             conn.commit()
     c.execute("SELECT * FROM keys")
     keys = c.fetchall()
     conn.close()
-    return render_template('admin.html', keys=keys)
+    return render_template('admin.html', keys=keys, generated_key=generated_key)
 
 
 @app.route('/api/verify', methods=['POST'])

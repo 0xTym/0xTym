@@ -10,6 +10,10 @@
   <form method="post">
     <input type="text" name="new_key" placeholder="New Key">
     <button type="submit">Add Key</button>
+    <button type="submit" name="generate">Generate Random Key</button>
+    {% if generated_key %}
+    <p>Generated Key: <code>{{ generated_key }}</code></p>
+    {% endif %}
     <h3>Existing Keys</h3>
     <ul>
       {% for key in keys %}
