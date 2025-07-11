@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+</head>
+<body>
+  <h2>Key Management</h2>
+  <p><a href="{{ url_for('logout') }}">Logout</a></p>
+  <form method="post">
+    <input type="text" name="new_key" placeholder="New Key">
+    <button type="submit">Add Key</button>
+    <h3>Existing Keys</h3>
+    <ul>
+      {% for key in keys %}
+        <li>
+          {{ key['key'] }} - {% if key['active'] %}active{% else %}inactive{% endif %}
+          {% if key['active'] %}
+          <button name="deactivate" value="{{ key['id'] }}">Deactivate</button>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </form>
+</body>
+</html>
