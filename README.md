@@ -24,7 +24,17 @@
 
 ## 🌟 Projects
 
-ToDo
+### Auto Installer Example
+
+Dieses Repository enthält ein Beispielskript, das benötigte Python-Pakete automatisch installiert und anschließend einen zufälligen Katzenfakt ausgibt. Das Skript befindet sich in `auto_installer_example.py`.
+
+Führe es mit:
+
+```bash
+python auto_installer_example.py
+```
+
+Falls `requests` oder `rich` nicht vorhanden sind, installiert das Skript diese automatisch.
 
 ---
 
