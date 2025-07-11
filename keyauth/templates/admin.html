@@ -1,30 +1,45 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Admin Panel</title>
-</head>
-<body>
-  <h2>Key Management</h2>
-  <p><a href="{{ url_for('logout') }}">Logout</a></p>
-  <form method="post">
-    <input type="text" name="new_key" placeholder="New Key">
-    <button type="submit">Add Key</button>
-    <button type="submit" name="generate">Generate Random Key</button>
-    {% if generated_key %}
-    <p>Generated Key: <code>{{ generated_key }}</code></p>
-    {% endif %}
-    <h3>Existing Keys</h3>
-    <ul>
-      {% for key in keys %}
-        <li>
-          {{ key['key'] }} - {% if key['active'] %}active{% else %}inactive{% endif %}
-          {% if key['active'] %}
-          <button name="deactivate" value="{{ key['id'] }}">Deactivate</button>
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  </form>
-</body>
-</html>
+{% extends 'base.html' %}
+{% block title %}Admin Panel{% endblock %}
+{% block content %}
+<h3 class="mb-4">Key Management</h3>
+<form method="post" class="mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-6 col-md-4">
+      <input class="form-control" type="text" name="new_key" placeholder="New Key">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-success" type="submit">Add Key</button>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-secondary" type="submit" name="generate">Generate Random Key</button>
+    </div>
+  </div>
+</form>
+{% if generated_key %}
+<div class="alert alert-info">Generated Key: <code>{{ generated_key }}</code></div>
+{% endif %}
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for key in keys %}
+    <tr>
+      <td>{{ key['key'] }}</td>
+      <td>{% if key['active'] %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+      <td>
+        {% if key['active'] %}
+        <form method="post" class="d-inline">
+          <button class="btn btn-sm btn-danger" name="deactivate" value="{{ key['id'] }}">Deactivate</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
