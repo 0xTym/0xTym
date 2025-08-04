@@ -24,7 +24,14 @@
 
 ## 🌟 Projects
 
-ToDo
+- 📝 **PDF Übersetzer** – Streamlit App zur Übersetzung von PDFs mit der 302.api.
+
+### Ausführen
+
+```
+pip install -r requirements.txt
+streamlit run pdf_translator_app.py
+```
 
 ---
 
