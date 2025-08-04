@@ -24,7 +24,7 @@
 
 ## 🌟 Projects
 
-- 📝 **PDF Übersetzer** – Streamlit App zur Übersetzung von PDFs mit der 302.api.
+- 📝 **PDF Übersetzer** – Streamlit App zur Übersetzung von PDFs mit der 302.api. Unterstützt auch PDFs mit Bildern und erhält die grundlegende Formatierung.
 
 ### Ausführen
 
