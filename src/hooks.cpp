@@ -1,5 +1,6 @@
 #include "hooks.h"
 #include "esp.h"
+#include "rendering.h"
 #include <cstring>
 
 namespace Hooks {
@@ -60,6 +61,9 @@ namespace Hooks {
     }
 
     BOOL WINAPI hkWglSwapBuffers(HDC hdc) {
+        // Set global HDC for text rendering
+        Rendering::g_hdc = hdc;
+
         // Render ESP
         if (ESP::config.enabled) {
             ESP::Render();
@@ -91,6 +95,9 @@ namespace Hooks {
     }
 
     void Shutdown() {
+        // Cleanup rendering resources
+        Rendering::CleanupFont();
+
         if (oWglSwapBuffers) {
             HMODULE opengl32 = GetModuleHandleA("opengl32.dll");
             if (opengl32) {

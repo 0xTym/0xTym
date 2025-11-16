@@ -12,6 +12,7 @@ set(SOURCES
     src/main.cpp
     src/esp.cpp
     src/hooks.cpp
+    src/rendering.cpp
 )
 
 # Create shared library (DLL)

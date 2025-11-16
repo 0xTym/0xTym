@@ -1,6 +1,8 @@
 #include "esp.h"
 #include "memory.h"
+#include "rendering.h"
 #include <cmath>
+#include <cstring>
 #include <string>
 
 namespace ESP {
@@ -106,15 +108,8 @@ namespace ESP {
     }
 
     void DrawString(float x, float y, const char* text, float r, float g, float b) {
-        glColor3f(r, g, b);
-        glRasterPos2f(x, y);
-
-        // Simple text rendering using GLUT bitmap fonts
-        // Note: This is basic and may need replacement with better text rendering
-        while (*text) {
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *text);
-            text++;
-        }
+        // Use the rendering module for text drawing
+        Rendering::DrawText(x, y, text, r, g, b);
     }
 
     void Render() {
