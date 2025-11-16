@@ -14,8 +14,24 @@ set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 # Check if ImGui exists
 if(NOT EXISTS ${IMGUI_DIR}/imgui.cpp)
     message(FATAL_ERROR
-        "ImGui not found! Please download ImGui and place it in external/imgui/\n"
-        "See external/IMGUI_SETUP.md for instructions.")
+        "\n"
+        "========================================\n"
+        " ImGui NOT FOUND!\n"
+        "========================================\n"
+        "\n"
+        "ImGui is required to build this project.\n"
+        "\n"
+        "QUICK FIX (Windows):\n"
+        "  1. Open PowerShell in the 'external' folder\n"
+        "  2. Run: .\\download_imgui.ps1\n"
+        "     Or: .\\download_imgui.bat\n"
+        "\n"
+        "MANUAL INSTALLATION:\n"
+        "  See external/README.md or external/IMGUI_SETUP.md\n"
+        "\n"
+        "After installing ImGui, delete the build folder and run CMake again.\n"
+        "========================================\n"
+    )
 endif()
 
 # ImGui source files
