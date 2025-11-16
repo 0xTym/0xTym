@@ -19,14 +19,31 @@ set(SOURCES
 add_library(SauerbratenESP SHARED ${SOURCES})
 
 # Link libraries
-target_link_libraries(SauerbratenESP
-    opengl32
-    glu32
-)
+if(WIN32)
+    target_link_libraries(SauerbratenESP PRIVATE
+        opengl32
+        glu32
+        gdi32
+    )
+else()
+    target_link_libraries(SauerbratenESP PRIVATE
+        GL
+        GLU
+    )
+endif()
 
 # Set compile options
 if(MSVC)
     target_compile_options(SauerbratenESP PRIVATE /W4)
+    # Disable warnings about unsafe functions
+    target_compile_definitions(SauerbratenESP PRIVATE _CRT_SECURE_NO_WARNINGS)
+    # Set subsystem to windows and entry point for DLL
+    set_target_properties(SauerbratenESP PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:WINDOWS /DLL"
+    )
 else()
     target_compile_options(SauerbratenESP PRIVATE -Wall -Wextra -fpermissive)
+    set_target_properties(SauerbratenESP PROPERTIES
+        LINK_FLAGS "-shared"
+    )
 endif()
