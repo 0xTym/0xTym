@@ -15,7 +15,7 @@ bool MemoryReader::AttachToProcess(const std::wstring& processName) {
         return false;
     }
 
-    processHandle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, processId);
+    processHandle = OpenProcess(PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION, FALSE, processId);
     if (processHandle == nullptr) {
         std::wcerr << L"Failed to open process handle. Error code: " << GetLastError() << std::endl;
         return false;
@@ -49,6 +49,12 @@ bool MemoryReader::ReadBuffer(uintptr_t address, void* buffer, size_t size) {
     SIZE_T bytesRead = 0;
     bool success = ReadProcessMemory(processHandle, (LPCVOID)address, buffer, size, &bytesRead);
     return success && bytesRead == size;
+}
+
+bool MemoryReader::WriteBuffer(uintptr_t address, void* buffer, size_t size) {
+    SIZE_T bytesWritten = 0;
+    bool success = WriteProcessMemory(processHandle, (LPVOID)address, buffer, size, &bytesWritten);
+    return success && bytesWritten == size;
 }
 
 DWORD MemoryReader::GetProcessIdByName(const std::wstring& processName) {

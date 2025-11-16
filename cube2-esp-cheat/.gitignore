@@ -28,7 +28,6 @@ Makefile
 *.log
 
 # IDE files
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -41,3 +40,10 @@ Thumbs.db
 # Output binaries
 bin/
 lib/
+
+# External dependencies (user must download)
+external/imgui/
+
+# Keep setup instructions
+!external/IMGUI_SETUP.md
+!external/.gitkeep

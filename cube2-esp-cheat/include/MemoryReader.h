@@ -24,8 +24,15 @@ public:
     bool Read(uintptr_t address, T& buffer);
 
     bool ReadBuffer(uintptr_t address, void* buffer, size_t size);
+
+    template<typename T>
+    bool Write(uintptr_t address, T value);
+
+    bool WriteBuffer(uintptr_t address, void* buffer, size_t size);
+
     uintptr_t GetBaseAddress() const { return baseAddress; }
     bool IsAttached() const { return processHandle != nullptr; }
+    DWORD GetProcessId() const { return processId; }
 
 private:
     DWORD GetProcessIdByName(const std::wstring& processName);
@@ -45,4 +52,11 @@ bool MemoryReader::Read(uintptr_t address, T& buffer) {
     SIZE_T bytesRead = 0;
     bool success = ReadProcessMemory(processHandle, (LPCVOID)address, &buffer, sizeof(T), &bytesRead);
     return success && bytesRead == sizeof(T);
+}
+
+template<typename T>
+bool MemoryReader::Write(uintptr_t address, T value) {
+    SIZE_T bytesWritten = 0;
+    bool success = WriteProcessMemory(processHandle, (LPVOID)address, &value, sizeof(T), &bytesWritten);
+    return success && bytesWritten == sizeof(T);
 }
