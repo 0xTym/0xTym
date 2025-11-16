@@ -42,7 +42,23 @@ uintptr_t playerCountOffset = 0x346C9C;
 
 ### Build Steps
 
-#### Using Visual Studio
+#### Quick Build (Recommended - Windows)
+
+Simply run the included build script:
+
+```bash
+build.bat
+```
+
+This will automatically:
+- Detect Visual Studio version
+- Configure CMake
+- Build both DLL and Loader
+- Show output file locations
+
+#### Manual Build
+
+##### Using Visual Studio
 
 ```bash
 # Clone the repository
@@ -75,26 +91,38 @@ The compiled DLL will be in `build/bin/SauerbratenESP.dll`
 
 ### Injection Methods
 
-#### Method 1: Included Stealth Loader (Recommended)
+#### Method 1: Quick Injection Script (Easiest)
+
+Run the included injection script as Administrator:
+
+```bash
+inject.bat
+```
+
+This will:
+- Check for Administrator privileges
+- Verify all files exist
+- Let you choose injection mode (Stealth/Fast/Wait)
+- Automatically inject into Sauerbraten
+
+#### Method 2: Manual Injection with Loader
 
 The project includes an advanced stealth loader with manual mapping:
 
 ```bash
-# Build the loader
-cd loader/build
-cmake .. -G "Visual Studio 17 2022" -A Win32
-cmake --build . --config Release
-
 # Use the loader (manual mapping - stealthiest)
-SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll
+build\bin\SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll
 
 # Or use LoadLibrary mode (faster, less stealth)
-SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll --loadlib
+build\bin\SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll --loadlib
+
+# Wait for game to start
+build\bin\SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll --wait
 ```
 
 See [loader/README.md](loader/README.md) for detailed documentation.
 
-#### Method 2: External Injectors
+#### Method 3: External Injectors
 
 Alternatively, use third-party injectors:
 - Extreme Injector
