@@ -73,14 +73,33 @@ The compiled DLL will be in `build/bin/SauerbratenESP.dll`
 
 ## 🚀 Usage
 
-### Injection
+### Injection Methods
 
-1. Launch Cube 2: Sauerbraten
-2. Use a DLL injector to inject `SauerbratenESP.dll` into the game process
-3. Recommended injectors:
-   - Extreme Injector
-   - Process Hacker
-   - Custom injector
+#### Method 1: Included Stealth Loader (Recommended)
+
+The project includes an advanced stealth loader with manual mapping:
+
+```bash
+# Build the loader
+cd loader/build
+cmake .. -G "Visual Studio 17 2022" -A Win32
+cmake --build . --config Release
+
+# Use the loader (manual mapping - stealthiest)
+SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll
+
+# Or use LoadLibrary mode (faster, less stealth)
+SauerbratenLoader.exe sauerbraten.exe SauerbratenESP.dll --loadlib
+```
+
+See [loader/README.md](loader/README.md) for detailed documentation.
+
+#### Method 2: External Injectors
+
+Alternatively, use third-party injectors:
+- Extreme Injector
+- Process Hacker
+- Xenos Injector
 
 ### Controls
 
