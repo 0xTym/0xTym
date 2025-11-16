@@ -1,10 +1,15 @@
 #include "loader.h"
+#include <Windows.h>
 #include <TlHelp32.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <cstring>
 
 namespace Loader {
+
+    // DllMain function pointer type
+    typedef BOOL(WINAPI* DllMainFunc)(HINSTANCE, DWORD, LPVOID);
 
     // Shellcode for loading DLL in remote process
     #pragma pack(push, 1)
@@ -18,7 +23,6 @@ namespace Loader {
         decltype(&LoadLibraryA) fnLoadLibraryA;
         decltype(&GetProcAddress) fnGetProcAddress;
         decltype(&VirtualProtect) fnVirtualProtect;
-        decltype(&DllMain) fnDllMain;
     };
     #pragma pack(pop)
 
@@ -103,7 +107,7 @@ namespace Loader {
 
         // Call DllMain
         if (pNtHeaders->OptionalHeader.AddressOfEntryPoint) {
-            auto DllMain = (BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID))((LPBYTE)pData->imageBase + pNtHeaders->OptionalHeader.AddressOfEntryPoint);
+            DllMainFunc DllMain = (DllMainFunc)((LPBYTE)pData->imageBase + pNtHeaders->OptionalHeader.AddressOfEntryPoint);
             DllMain((HINSTANCE)pData->imageBase, DLL_PROCESS_ATTACH, NULL);
         }
 
