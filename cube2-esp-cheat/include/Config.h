@@ -1,6 +1,24 @@
 #pragma once
 #include <cstdint>
 
+// Virtual Key Codes
+#ifndef VK_LBUTTON
+#define VK_LBUTTON        0x01
+#define VK_RBUTTON        0x02
+#define VK_MBUTTON        0x04
+#define VK_XBUTTON1       0x05
+#define VK_XBUTTON2       0x06
+#define VK_SHIFT          0x10
+#define VK_CONTROL        0x11
+#define VK_MENU           0x12
+#define VK_INSERT         0x2D
+#define VK_DELETE         0x2E
+#define VK_HOME           0x24
+#define VK_END            0x23
+#define VK_PRIOR          0x21
+#define VK_NEXT           0x22
+#endif
+
 namespace CheatConfig {
 
     // ESP Settings
