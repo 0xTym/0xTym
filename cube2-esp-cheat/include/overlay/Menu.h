@@ -23,7 +23,7 @@ public:
     Menu();
     ~Menu();
 
-    void Render(MemoryReader& memReader);
+    void Render(MemoryReader* memReader = nullptr);
 
 private:
     void RenderHeader();

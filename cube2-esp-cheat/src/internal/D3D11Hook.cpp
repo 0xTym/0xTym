@@ -237,11 +237,10 @@ void D3D11Hook::RenderImGui() {
 
     // Static menu instance
     static Menu menu;
-    static DirectMemory* dummyMem = nullptr; // Not used in internal version
 
-    // Render menu
+    // Render menu (nullptr for internal version - not needed)
     if (CheatConfig::g_Config.menu.visible) {
-        menu.Render(*reinterpret_cast<MemoryReader*>(dummyMem));
+        menu.Render(nullptr);
     }
 
     // Status overlay

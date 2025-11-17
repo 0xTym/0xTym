@@ -165,7 +165,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         ImGui::NewFrame();
 
         // Render menu
-        menu.Render(*g_MemReader);
+        menu.Render(g_MemReader);
 
         // Status window
         ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);

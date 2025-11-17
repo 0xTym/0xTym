@@ -9,12 +9,15 @@ Menu::Menu()
 Menu::~Menu() {
 }
 
-void Menu::Render(MemoryReader& memReader) {
+void Menu::Render(MemoryReader* memReader) {
     using namespace CheatConfig;
 
     if (!g_Config.menu.visible) {
         return;
     }
+
+    // Note: memReader is not used in menu rendering (only for external version status)
+    // For internal version, memReader will be nullptr
 
     // Set window style
     ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_FirstUseEver);
