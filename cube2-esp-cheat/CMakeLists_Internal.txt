@@ -51,7 +51,6 @@ set(INTERNAL_SOURCES
     src/internal/DllMain.cpp
     src/internal/DirectMemory.cpp
     src/internal/AimbotInternal.cpp
-    src/internal/D3D11Hook.cpp
     src/overlay/Menu.cpp
 )
 
@@ -59,7 +58,6 @@ set(INTERNAL_SOURCES
 set(INTERNAL_HEADERS
     include/internal/DirectMemory.h
     include/internal/AimbotInternal.h
-    include/internal/D3D11Hook.h
     include/GameStructures.h
     include/Config.h
     include/overlay/Menu.h
