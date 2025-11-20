@@ -89,8 +89,7 @@ if not na(pivotLow)
 
 // Downtrend = Lower Lows (LL) + Lower Highs (LH)
 // Price must be below last Lower High
-isDowntrend = not na(lastLH) and not na(lastLL) and not na(prevLH) and
-              lastLH < prevLH and close < lastLH
+isDowntrend = not na(lastLH) and not na(lastLL) and not na(prevLH) and lastLH < prevLH and close < lastLH
 
 // Visualize market structure
 if showStructure and not na(lastLH) and bar_index - lastLHBar < 100
@@ -143,8 +142,7 @@ if showZones and not na(supplyZoneBox)
     box.set_right(supplyZoneBox, bar_index + 20)
 
 // Check if price is in supply zone
-inSupplyZone = not na(supplyZoneTop) and not na(supplyZoneBottom) and
-               close >= supplyZoneBottom and close <= supplyZoneTop
+inSupplyZone = not na(supplyZoneTop) and not na(supplyZoneBottom) and close >= supplyZoneBottom and close <= supplyZoneTop
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CANDLESTICK PATTERN DETECTION
@@ -162,27 +160,18 @@ isBullish = close > open
 // - Long upper wick (at least 2.5x body size)
 // - Small body in lower part
 // - Minimal lower wick
-bearishPinBar = enablePinBar and isBearish and
-                upperWick > bodySize * pinBarRatio and
-                lowerWick < bodySize * 0.3 and
-                bodySize > 0
+bearishPinBar = enablePinBar and isBearish and upperWick > bodySize * pinBarRatio and lowerWick < bodySize * 0.3 and bodySize > 0
 
 // 2. Bearish Engulfing
 // - Previous candle is bullish
 // - Current candle is bearish and engulfs previous
-bearishEngulfing = enableEngulfing and isBearish and isBullish[1] and
-                   close < open[1] and open > close[1] and
-                   bodySize > bodySize[1] * 0.8
+bearishEngulfing = enableEngulfing and isBearish and isBullish[1] and close < open[1] and open > close[1] and bodySize > bodySize[1] * 0.8
 
 // 3. Evening Star (3-candle pattern)
 // - Candle 1: Strong bullish
 // - Candle 2: Small body (doji/spinning top)
 // - Candle 3: Strong bearish closing below candle 1's midpoint
-eveningStar = enableEveningStar and
-              isBullish[2] and bodySize[2] > totalRange[2] * 0.6 and
-              bodySize[1] < totalRange[1] * 0.3 and
-              isBearish and bodySize > totalRange * 0.6 and
-              close < (open[2] + close[2]) / 2
+eveningStar = enableEveningStar and isBullish[2] and bodySize[2] > totalRange[2] * 0.6 and bodySize[1] < totalRange[1] * 0.3 and isBearish and bodySize > totalRange * 0.6 and close < (open[2] + close[2]) / 2
 
 // Combined pattern signal
 bearishPattern = bearishPinBar or bearishEngulfing or eveningStar
@@ -198,11 +187,7 @@ bearishPattern = bearishPinBar or bearishEngulfing or eveningStar
 // 4. RSI filter (RSI < threshold, avoiding overbought)
 // 5. Candle closed (confirmation)
 
-entrySignal = isDowntrend and
-              inSupplyZone and
-              bearishPattern and
-              rsi < rsiThreshold and
-              barstate.isconfirmed
+entrySignal = isDowntrend and inSupplyZone and bearishPattern and rsi < rsiThreshold and barstate.isconfirmed
 
 // Track if we already have an open signal
 var bool signalActive = false
