@@ -81,6 +81,7 @@ if not na(pivotLow)
         lastLLBar := bar_index - swingLength
     else if pivotLow > lastLL
         // Trend might be reversing
+        na
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TREND DETERMINATION
