@@ -1,0 +1,160 @@
+cmake_minimum_required(VERSION 3.15)
+project(Cube2Internal VERSION 2.0.0 LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Output directory
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# ImGui path
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
+
+# Check if ImGui exists
+if(NOT EXISTS ${IMGUI_DIR}/imgui.cpp)
+    message(FATAL_ERROR
+        "\n"
+        "========================================\n"
+        " ImGui NOT FOUND!\n"
+        "========================================\n"
+        "\n"
+        "ImGui is required to build this project.\n"
+        "\n"
+        "QUICK FIX (Windows):\n"
+        "  1. Open PowerShell in the 'external' folder\n"
+        "  2. Run: .\\download_imgui.ps1\n"
+        "     Or: .\\download_imgui.bat\n"
+        "\n"
+        "MANUAL INSTALLATION:\n"
+        "  See external/README.md or external/IMGUI_SETUP.md\n"
+        "\n"
+        "After installing ImGui, delete the build folder and run CMake again.\n"
+        "========================================\n"
+    )
+endif()
+
+# ImGui source files
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_impl_dx11.cpp
+    ${IMGUI_DIR}/imgui_impl_win32.cpp
+)
+
+# Internal DLL source files
+set(INTERNAL_SOURCES
+    src/internal/DllMain.cpp
+    src/internal/DirectMemory.cpp
+    src/internal/AimbotInternal.cpp
+    src/overlay/Menu.cpp
+)
+
+# Internal DLL header files
+set(INTERNAL_HEADERS
+    include/internal/DirectMemory.h
+    include/internal/AimbotInternal.h
+    include/GameStructures.h
+    include/Config.h
+    include/overlay/Menu.h
+)
+
+# Injector source files
+set(INJECTOR_SOURCES
+    src/injector/Injector.cpp
+)
+
+# ============================================
+# BUILD 1: Internal DLL
+# ============================================
+
+# Create DLL
+add_library(Cube2Internal SHARED ${INTERNAL_SOURCES} ${INTERNAL_HEADERS} ${IMGUI_SOURCES})
+
+# Include directories for DLL
+target_include_directories(Cube2Internal PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/internal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/overlay
+    ${IMGUI_DIR}
+)
+
+# Platform-specific settings for DLL
+if(WIN32)
+    target_compile_definitions(Cube2Internal PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+
+    # Link DirectX11 and other Windows libraries
+    target_link_libraries(Cube2Internal PRIVATE
+        d3d11.lib
+        dxgi.lib
+        d3dcompiler.lib
+        dwmapi.lib
+    )
+
+    if(MSVC)
+        set_property(TARGET Cube2Internal PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+        target_compile_options(Cube2Internal PRIVATE /W4 /wd4100 /wd4201 /wd4996)
+    else()
+        target_link_options(Cube2Internal PRIVATE -static)
+        target_compile_options(Cube2Internal PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    endif()
+else()
+    message(FATAL_ERROR "This project is designed for Windows only")
+endif()
+
+# ============================================
+# BUILD 2: Injector EXE
+# ============================================
+
+# Create injector executable
+add_executable(Cube2Injector ${INJECTOR_SOURCES})
+
+# Platform-specific settings for Injector
+if(WIN32)
+    target_compile_definitions(Cube2Injector PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+
+    # Set subsystem to console
+    set_target_properties(Cube2Injector PROPERTIES
+        WIN32_EXECUTABLE FALSE
+    )
+
+    if(MSVC)
+        set_property(TARGET Cube2Injector PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+        target_compile_options(Cube2Injector PRIVATE /W4)
+    else()
+        target_link_options(Cube2Injector PRIVATE -static)
+        target_compile_options(Cube2Injector PRIVATE -Wall -Wextra)
+    endif()
+endif()
+
+# Print build information
+message(STATUS "===========================================")
+message(STATUS "Cube 2: Sauerbraten INTERNAL Cheat Suite")
+message(STATUS "===========================================")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Output directory: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+message(STATUS "ImGui directory: ${IMGUI_DIR}")
+message(STATUS "")
+message(STATUS "Targets:")
+message(STATUS "  - Cube2Internal.dll (Internal cheat DLL)")
+message(STATUS "  - Cube2Injector.exe (DLL injector)")
+message(STATUS "===========================================")

@@ -1,0 +1,49 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Visual Studio files
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.user
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Compiled files
+*.exe
+*.obj
+*.o
+*.ilk
+*.pdb
+*.log
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Output binaries
+bin/
+lib/
+
+# External dependencies (user must download)
+external/imgui/
+
+# Keep setup instructions
+!external/IMGUI_SETUP.md
+!external/.gitkeep
