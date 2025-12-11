@@ -33,3 +33,29 @@ ToDo
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/your-profile/)
 [![Twitter](https://img.shields.io/badge/Twitter-Profile-blue?style=for-the-badge&logo=twitter)](https://twitter.com/your-profile)
 [![Website](https://img.shields.io/badge/Website-Portfolio-green?style=for-the-badge)](https://your-website.com)
+
+---
+
+## Nwipe Minimal Setup (Maximale Kompatibilitaet)
+
+Nwipe is a command-line tool used to securely wipe disks. The following steps outline a minimal setup to run Nwipe with maximum compatibility:
+
+1. **Boot a Minimal Linux Environment**  
+   Use a lightweight Linux distribution (e.g., Debian or Ubuntu live image). This ensures Nwipe has broad hardware support.
+
+2. **Install Nwipe**  
+   On Debian-based systems run:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install nwipe
+   ```
+
+3. **Run Nwipe**  
+   Start Nwipe with a straightforward method for best hardware compatibility:
+   ```bash
+   sudo nwipe --method zero
+   ```
+   Select the target drive and confirm the operation.
+
+This minimal approach avoids advanced drivers or GUI dependencies and works on most common hardware.
+
