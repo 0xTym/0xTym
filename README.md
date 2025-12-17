@@ -10,6 +10,7 @@ Dieses Repo enthält ein lauffähiges RL-Grundgerüst für Trading:
 
 - **Daten**: CSV (OHLCV)
 - **State/Features**: u. a. OHLC-Returns, ATR, RSI, Market-Structure (Pivot-basiert, approx), Liquidity-Sweeps (simple), FVG (simple), Candlestick-Patterns (bearish)
+- **Price Action (wichtig)**: Pivot-basierte Marktstruktur **HH / LH / HL / LL** als Features (inkl. `ms_downtrend`/`ms_uptrend`)
 - **Action Space**: `0=Hold`, `1=Buy/Long`, `2=Sell/Short`
 - **Reward/Punkte**: Equity-Delta + Reward-Shaping (TP/SL, Overtrading, Drawdown, Regel-Bonus)
 

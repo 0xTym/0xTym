@@ -141,6 +141,92 @@ def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
     out["pivot_high"] = ph
     out["pivot_low"] = pl
 
+    # -------------------------------------------------------------------------
+    # Price Action Market Structure (HH/LH/HL/LL) - pivot based
+    #
+    # - Pivot Highs classified as Higher High (HH) or Lower High (LH)
+    # - Pivot Lows classified as Higher Low (HL) or Lower Low (LL)
+    #
+    # We expose two kinds of signals:
+    # - pivot_* flags: only 1 on the pivot bar where it was confirmed
+    # - ms_last_* flags: "last confirmed structure state", carried forward
+    # -------------------------------------------------------------------------
+    last_sh = np.nan  # last swing high value
+    prev_sh = np.nan  # previous swing high value
+    last_sl = np.nan  # last swing low value
+    prev_sl = np.nan  # previous swing low value
+
+    last_sh_arr = np.full(len(out), np.nan)
+    prev_sh_arr = np.full(len(out), np.nan)
+    last_sl_arr = np.full(len(out), np.nan)
+    prev_sl_arr = np.full(len(out), np.nan)
+
+    pivot_hh = np.zeros(len(out), dtype=np.int8)
+    pivot_lh = np.zeros(len(out), dtype=np.int8)
+    pivot_hl = np.zeros(len(out), dtype=np.int8)
+    pivot_ll = np.zeros(len(out), dtype=np.int8)
+
+    ms_last_high_hh = np.zeros(len(out), dtype=np.int8)
+    ms_last_high_lh = np.zeros(len(out), dtype=np.int8)
+    ms_last_low_hl = np.zeros(len(out), dtype=np.int8)
+    ms_last_low_ll = np.zeros(len(out), dtype=np.int8)
+
+    for i in range(len(out)):
+        # carry forward last state by default
+        if i > 0:
+            ms_last_high_hh[i] = ms_last_high_hh[i - 1]
+            ms_last_high_lh[i] = ms_last_high_lh[i - 1]
+            ms_last_low_hl[i] = ms_last_low_hl[i - 1]
+            ms_last_low_ll[i] = ms_last_low_ll[i - 1]
+
+        if np.isfinite(ph[i]):
+            prev_sh = last_sh
+            last_sh = ph[i]
+            if np.isfinite(prev_sh):
+                if last_sh > prev_sh:
+                    pivot_hh[i] = 1
+                    ms_last_high_hh[i] = 1
+                    ms_last_high_lh[i] = 0
+                else:
+                    pivot_lh[i] = 1
+                    ms_last_high_hh[i] = 0
+                    ms_last_high_lh[i] = 1
+
+        if np.isfinite(pl[i]):
+            prev_sl = last_sl
+            last_sl = pl[i]
+            if np.isfinite(prev_sl):
+                if last_sl > prev_sl:
+                    pivot_hl[i] = 1
+                    ms_last_low_hl[i] = 1
+                    ms_last_low_ll[i] = 0
+                else:
+                    pivot_ll[i] = 1
+                    ms_last_low_hl[i] = 0
+                    ms_last_low_ll[i] = 1
+
+        last_sh_arr[i] = last_sh
+        prev_sh_arr[i] = prev_sh
+        last_sl_arr[i] = last_sl
+        prev_sl_arr[i] = prev_sl
+
+    out["last_swing_high"] = last_sh_arr
+    out["prev_swing_high"] = prev_sh_arr
+    out["last_swing_low"] = last_sl_arr
+    out["prev_swing_low"] = prev_sl_arr
+
+    out["pivot_hh"] = pivot_hh
+    out["pivot_lh"] = pivot_lh
+    out["pivot_hl"] = pivot_hl
+    out["pivot_ll"] = pivot_ll
+
+    out["ms_last_high_hh"] = ms_last_high_hh
+    out["ms_last_high_lh"] = ms_last_high_lh
+    out["ms_last_low_hl"] = ms_last_low_hl
+    out["ms_last_low_ll"] = ms_last_low_ll
+    out["ms_downtrend"] = ((out["ms_last_high_lh"] == 1) & (out["ms_last_low_ll"] == 1)).astype(np.int8)
+    out["ms_uptrend"] = ((out["ms_last_high_hh"] == 1) & (out["ms_last_low_hl"] == 1)).astype(np.int8)
+
     last_lh = np.nan
     prev_lh = np.nan
     last_ll = np.nan
@@ -222,6 +308,11 @@ DEFAULT_FEATURE_COLUMNS = [
     "oc_change",
     "atr",
     "rsi",
+    "ms_last_high_hh",
+    "ms_last_high_lh",
+    "ms_last_low_hl",
+    "ms_last_low_ll",
+    "ms_downtrend",
     "is_downtrend",
     "in_supply_zone",
     "liq_sweep_high",
