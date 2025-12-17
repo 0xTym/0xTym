@@ -25,7 +25,12 @@ def main() -> None:
     obs, _ = env.reset()
     for _ in range(10):
         obs, r, term, trunc, info = env.step(env.action_space.sample())
-        print(info["step"])
+        s = info["step"]
+        print(
+            s,
+            f" setup_long={info.get('setup_long')} setup_short={info.get('setup_short')}"
+            f" rule_long={info.get('rule_long')} rule_short={info.get('rule_short')}",
+        )
         if term or trunc:
             break
 

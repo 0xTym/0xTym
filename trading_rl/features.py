@@ -177,6 +177,12 @@ class FeatureConfig:
     atr_len: int = 14
     zone_atr_mult: float = 1.0
     pin_ratio: float = 2.5
+    # Multi-step setup detection
+    consolidation_len: int = 20
+    consolidation_atr_mult: float = 1.25  # range < ATR*mult => consolidation
+    breakout_atr_mult: float = 0.15  # breakout beyond range by ATR*mult
+    correction_lookahead: int = 25  # bars after breakout to accept correction
+    continuation_lookahead: int = 50  # bars after correction/entry to accept continuation
 
 
 def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
@@ -387,6 +393,61 @@ def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
     out["hl_range"] = (out["high"] - out["low"]) / (out["close"].abs() + 1e-12)
     out["oc_change"] = (out["close"] - out["open"]) / (out["close"].abs() + 1e-12)
 
+    # -------------------------------------------------------------------------
+    # Multi-step setup features: Consolidation -> Breakout -> Correction -> Continuation
+    # (simple, rule-of-thumb proxies; meant for RL shaping + state context)
+    # -------------------------------------------------------------------------
+    n = max(2, int(cfg.consolidation_len))
+    atr_f = out["atr"].bfill().fillna(0.0)
+    atr_safe = atr_f.mask(atr_f <= 0, 1e-12)
+
+    roll_hi = out["high"].rolling(n, min_periods=n).max()
+    roll_lo = out["low"].rolling(n, min_periods=n).min()
+    cons_range = (roll_hi - roll_lo).fillna(0.0)
+    out["cons_range"] = cons_range
+    out["cons_range_atr"] = (cons_range / atr_safe).clip(lower=0.0).fillna(0.0)
+    out["is_consolidating"] = ((out["cons_range_atr"] > 0) & (out["cons_range_atr"] <= float(cfg.consolidation_atr_mult))).astype(np.int8)
+
+    # Breakout: close breaks prior consolidation range with small ATR buffer
+    prev_roll_hi = roll_hi.shift(1)
+    prev_roll_lo = roll_lo.shift(1)
+    buf = atr_safe * float(cfg.breakout_atr_mult)
+
+    out["breakout_up"] = (
+        (out["is_consolidating"].shift(1).fillna(0).astype(int) == 1)
+        & (out["close"] > (prev_roll_hi + buf))
+    ).fillna(False).astype(np.int8)
+    out["breakout_down"] = (
+        (out["is_consolidating"].shift(1).fillna(0).astype(int) == 1)
+        & (out["close"] < (prev_roll_lo - buf))
+    ).fillna(False).astype(np.int8)
+
+    # Correction zone = retest of breakout level (previous range edge) or demand/supply zone
+    # We mark correction-ready when price comes back near breakout edge AND we see pattern.
+    corr_buf = atr_safe * 0.25
+    out["retest_high_edge"] = ((out["close"] <= (prev_roll_hi + corr_buf)) & (out["close"] >= (prev_roll_hi - corr_buf))).fillna(False).astype(np.int8)
+    out["retest_low_edge"] = ((out["close"] <= (prev_roll_lo + corr_buf)) & (out["close"] >= (prev_roll_lo - corr_buf))).fillna(False).astype(np.int8)
+
+    out["correction_long_ready"] = (
+        (out["ms_uptrend"] == 1)
+        & ((out["retest_high_edge"] == 1) | (out["in_demand_zone"] == 1))
+        & (out["bullish_pattern"] == 1)
+    ).astype(np.int8)
+
+    out["correction_short_ready"] = (
+        (out["ms_downtrend"] == 1)
+        & ((out["retest_low_edge"] == 1) | (out["in_supply_zone"] == 1))
+        & (out["bearish_pattern"] == 1)
+    ).astype(np.int8)
+
+    # Continuation proxy: after a correction-ready, price expands in breakout direction
+    # (simple: make new N-bar extreme)
+    cont_n = max(5, int(cfg.consolidation_len // 2))
+    out["new_high"] = (out["high"] >= out["high"].rolling(cont_n, min_periods=cont_n).max()).fillna(False).astype(np.int8)
+    out["new_low"] = (out["low"] <= out["low"].rolling(cont_n, min_periods=cont_n).min()).fillna(False).astype(np.int8)
+    out["continuation_up"] = ((out["ms_uptrend"] == 1) & (out["new_high"] == 1)).astype(np.int8)
+    out["continuation_down"] = ((out["ms_downtrend"] == 1) & (out["new_low"] == 1)).astype(np.int8)
+
     return out
 
 
@@ -414,4 +475,11 @@ DEFAULT_FEATURE_COLUMNS = [
     "bullish_pattern",
     "rule_short",
     "rule_long",
+    "is_consolidating",
+    "breakout_up",
+    "breakout_down",
+    "correction_long_ready",
+    "correction_short_ready",
+    "continuation_up",
+    "continuation_down",
 ]

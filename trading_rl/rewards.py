@@ -32,6 +32,7 @@ class RewardConfig:
     correction_entry_bonus: float = 0.20  # enter on correction (in zone + pattern)
     early_entry_penalty: float = 0.10  # entering before correction
     chase_breakout_penalty: float = 0.10  # entering on breakout candle
+    continuation_bonus: float = 0.15  # reward when continuation triggers after correction/entry
 
     # Risk shaping
     drawdown_penalty_scale: float = 1.0  # multiplied by current drawdown fraction

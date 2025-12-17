@@ -27,6 +27,11 @@ class EnvConfig:
     include_position_features: bool = True
     slippage_bps: float = 0.5  # 0.5 bps = 0.005%
     max_trade_bars: Optional[int] = None  # optional time-stop
+    # Multi-step setup timing (to prevent stale stages)
+    setup_max_wait_consolidation: int = 150
+    setup_max_wait_breakout: int = 150
+    setup_max_wait_correction: int = 80
+    setup_max_wait_continuation: int = 200
 
     # session filter (optional) - hours in 0..23
     session_start_hour: Optional[int] = None
@@ -71,6 +76,13 @@ class TradingEnv(gym.Env):
         self._rule_long = self.df.get("rule_long", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
         self._ms_uptrend = self.df.get("ms_uptrend", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
         self._ms_downtrend = self.df.get("ms_downtrend", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._is_consolidating = self.df.get("is_consolidating", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._breakout_up = self.df.get("breakout_up", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._breakout_down = self.df.get("breakout_down", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._corr_long = self.df.get("correction_long_ready", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._corr_short = self.df.get("correction_short_ready", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._cont_up = self.df.get("continuation_up", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._cont_down = self.df.get("continuation_down", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
 
         base_dim = self._base_features.shape[1]
         dyn_dim = 5 if self.env_cfg.include_position_features else 0
@@ -94,6 +106,17 @@ class TradingEnv(gym.Env):
         self.open_trade: Optional[Trade] = None
         self.trades: list[Trade] = []
         self._last_equity = env_cfg.initial_balance
+        # Setup stage trackers (0=none, 1=trend, 2=consolidation, 3=breakout, 4=correction/entry, 5=continuation done)
+        self._setup_long = 0
+        self._setup_short = 0
+        self._breakout_idx_long: Optional[int] = None
+        self._breakout_idx_short: Optional[int] = None
+        self._entry_idx_long: Optional[int] = None
+        self._entry_idx_short: Optional[int] = None
+        self._trend_idx_long: Optional[int] = None
+        self._trend_idx_short: Optional[int] = None
+        self._cons_idx_long: Optional[int] = None
+        self._cons_idx_short: Optional[int] = None
 
     def _in_session(self, i: int) -> bool:
         if self.env_cfg.session_start_hour is None or self.env_cfg.session_end_hour is None:
@@ -170,6 +193,16 @@ class TradingEnv(gym.Env):
         self.open_trade = None
         self.trades = []
         self._last_equity = self.env_cfg.initial_balance
+        self._setup_long = 0
+        self._setup_short = 0
+        self._breakout_idx_long = None
+        self._breakout_idx_short = None
+        self._entry_idx_long = None
+        self._entry_idx_short = None
+        self._trend_idx_long = None
+        self._trend_idx_short = None
+        self._cons_idx_long = None
+        self._cons_idx_short = None
         return self._get_obs(), {}
 
     def _slip(self) -> float:
@@ -243,16 +276,109 @@ class TradingEnv(gym.Env):
         # Optional session shaping
         in_session = self._in_session(i)
 
+        # ---------------------------------------------------------------------
+        # Multi-step setup shaping (Trend -> Consolidation -> Breakout -> Correction -> Continuation)
+        # Gives intermediate points; only triggers once per stage.
+        # ---------------------------------------------------------------------
+        up = int(self._ms_uptrend[i]) == 1
+        dn = int(self._ms_downtrend[i]) == 1
+        cons = int(self._is_consolidating[i]) == 1
+        bo_up = int(self._breakout_up[i]) == 1
+        bo_dn = int(self._breakout_down[i]) == 1
+        corr_l = int(self._corr_long[i]) == 1
+        corr_s = int(self._corr_short[i]) == 1
+        cont_up = int(self._cont_up[i]) == 1
+        cont_dn = int(self._cont_down[i]) == 1
+
+        # Long setup progress
+        if self._setup_long == 0 and up:
+            self._setup_long = 1
+            self._trend_idx_long = i
+            reward += self.reward_cfg.trend_recognition_bonus
+        if self._setup_long == 1 and self._trend_idx_long is not None:
+            if (i - self._trend_idx_long) > int(self.env_cfg.setup_max_wait_consolidation):
+                self._setup_long = 0
+                self._trend_idx_long = None
+        if self._setup_long == 1 and cons and up:
+            self._setup_long = 2
+            self._cons_idx_long = i
+            reward += self.reward_cfg.consolidation_wait_bonus
+        if self._setup_long == 2 and self._cons_idx_long is not None:
+            if (i - self._cons_idx_long) > int(self.env_cfg.setup_max_wait_breakout):
+                self._setup_long = 1
+                self._cons_idx_long = None
+        if self._setup_long == 2 and bo_up and up:
+            self._setup_long = 3
+            self._breakout_idx_long = i
+            reward += self.reward_cfg.breakout_patience_bonus
+        if self._setup_long == 3 and self._breakout_idx_long is not None:
+            if (i - self._breakout_idx_long) > int(self.env_cfg.setup_max_wait_correction):
+                self._setup_long = 1
+                self._breakout_idx_long = None
+                self._cons_idx_long = None
+        if self._setup_long == 3 and corr_l and up:
+            self._setup_long = 4  # correction ready
+
+        # Short setup progress
+        if self._setup_short == 0 and dn:
+            self._setup_short = 1
+            self._trend_idx_short = i
+            reward += self.reward_cfg.trend_recognition_bonus
+        if self._setup_short == 1 and self._trend_idx_short is not None:
+            if (i - self._trend_idx_short) > int(self.env_cfg.setup_max_wait_consolidation):
+                self._setup_short = 0
+                self._trend_idx_short = None
+        if self._setup_short == 1 and cons and dn:
+            self._setup_short = 2
+            self._cons_idx_short = i
+            reward += self.reward_cfg.consolidation_wait_bonus
+        if self._setup_short == 2 and self._cons_idx_short is not None:
+            if (i - self._cons_idx_short) > int(self.env_cfg.setup_max_wait_breakout):
+                self._setup_short = 1
+                self._cons_idx_short = None
+        if self._setup_short == 2 and bo_dn and dn:
+            self._setup_short = 3
+            self._breakout_idx_short = i
+            reward += self.reward_cfg.breakout_patience_bonus
+        if self._setup_short == 3 and self._breakout_idx_short is not None:
+            if (i - self._breakout_idx_short) > int(self.env_cfg.setup_max_wait_correction):
+                self._setup_short = 1
+                self._breakout_idx_short = None
+                self._cons_idx_short = None
+        if self._setup_short == 3 and corr_s and dn:
+            self._setup_short = 4  # correction ready
+
+        # ---------------------------------------------------------------------
         # Execute action / handle flips
+        # ---------------------------------------------------------------------
         did_trade_action = action in (1, 2)
 
         if self.position == 0:
             if action == 1 and self.env_cfg.allow_long:
                 self._open_position(direction=1)
                 reward -= self.reward_cfg.overtrade_penalty
+                # setup entry shaping
+                if self._setup_long == 4:
+                    reward += self.reward_cfg.correction_entry_bonus
+                    self._entry_idx_long = i
+                else:
+                    # entering too early / chasing breakout
+                    if self._breakout_idx_long is not None and i == self._breakout_idx_long:
+                        reward -= self.reward_cfg.chase_breakout_penalty
+                    else:
+                        reward -= self.reward_cfg.early_entry_penalty
             elif action == 2 and self.env_cfg.allow_short:
                 self._open_position(direction=-1)
                 reward -= self.reward_cfg.overtrade_penalty
+                # setup entry shaping
+                if self._setup_short == 4:
+                    reward += self.reward_cfg.correction_entry_bonus
+                    self._entry_idx_short = i
+                else:
+                    if self._breakout_idx_short is not None and i == self._breakout_idx_short:
+                        reward -= self.reward_cfg.chase_breakout_penalty
+                    else:
+                        reward -= self.reward_cfg.early_entry_penalty
         else:
             # invalid action: same direction again
             if (action == 1 and self.position == 1) or (action == 2 and self.position == -1):
@@ -356,6 +482,17 @@ class TradingEnv(gym.Env):
         elif action == 1:
             reward += self.reward_cfg.structure_bonus if int(self._ms_uptrend[i]) == 1 else -self.reward_cfg.structure_penalty
 
+        # Continuation shaping: only after correction-entry
+        if self._entry_idx_long is not None and self._setup_long < 5:
+            # time-bounded continuation
+            if (i - self._entry_idx_long) <= int(self.env_cfg.setup_max_wait_continuation) and cont_up and up:
+                reward += self.reward_cfg.continuation_bonus
+                self._setup_long = 5
+        if self._entry_idx_short is not None and self._setup_short < 5:
+            if (i - self._entry_idx_short) <= int(self.env_cfg.setup_max_wait_continuation) and cont_dn and dn:
+                reward += self.reward_cfg.continuation_bonus
+                self._setup_short = 5
+
         self._last_equity = self.equity
 
         # Advance time
@@ -380,6 +517,8 @@ class TradingEnv(gym.Env):
         }
         info["rule_short"] = rule_short
         info["rule_long"] = rule_long
+        info["setup_long"] = int(self._setup_long)
+        info["setup_short"] = int(self._setup_short)
 
         # Terminate if bankrupt-ish
         if self.equity <= 0:
