@@ -113,11 +113,67 @@ def bearish_patterns(df: pd.DataFrame, *, pin_ratio: float = 2.5) -> dict[str, n
     }
 
 
+def bullish_patterns(df: pd.DataFrame, *, pin_ratio: float = 2.5) -> dict[str, np.ndarray]:
+    """Einfache bullish Candlestick-Pattern-Erkennung (symmetrisch zu bearish)."""
+    o = df["open"].to_numpy(np.float64)
+    h = df["high"].to_numpy(np.float64)
+    l = df["low"].to_numpy(np.float64)
+    c = df["close"].to_numpy(np.float64)
+
+    body = np.abs(c - o)
+    upper = h - np.maximum(c, o)
+    lower = np.minimum(c, o) - l
+    rng = np.maximum(h - l, 1e-12)
+
+    is_bear = c < o
+    is_bull = c > o
+
+    # Bullish Pin Bar (Hammer)
+    pin = (is_bull) & (lower > body * pin_ratio) & (upper < body * 0.3) & (body > 0)
+
+    prev_bear = np.concatenate([[False], is_bear[:-1]])
+    prev_o = np.concatenate([[o[0]], o[:-1]])
+    prev_c = np.concatenate([[c[0]], c[:-1]])
+    prev_body = np.concatenate([[body[0]], body[:-1]])
+
+    # Bullish Engulfing
+    engulf = (is_bull) & prev_bear & (c > prev_o) & (o < prev_c) & (body > prev_body * 0.8)
+
+    # Morning Star (3 candles)
+    is_bear_2 = np.concatenate([[False, False], is_bear[:-2]])
+    body_2 = np.concatenate([[np.nan, np.nan], body[:-2]])
+    rng_2 = np.concatenate([[np.nan, np.nan], rng[:-2]])
+
+    body_1 = np.concatenate([[np.nan], body[:-1]])
+    rng_1 = np.concatenate([[np.nan], rng[:-1]])
+
+    mid_2 = np.concatenate([[np.nan, np.nan], ((o[:-2] + c[:-2]) / 2.0)])
+
+    morning = (
+        is_bear_2
+        & (body_2 > rng_2 * 0.6)
+        & (body_1 < rng_1 * 0.3)
+        & (is_bull)
+        & (body > rng * 0.6)
+        & (c > mid_2)
+    )
+
+    combined = pin | engulf | morning
+
+    return {
+        "bull_pin": pin.astype(np.int8),
+        "bull_engulf": engulf.astype(np.int8),
+        "morning_star": morning.astype(np.int8),
+        "bullish_pattern": combined.astype(np.int8),
+    }
+
+
 @dataclass(frozen=True)
 class FeatureConfig:
     swing_len: int = 10
     rsi_len: int = 14
     rsi_threshold: float = 60.0
+    rsi_long_threshold: float = 40.0
     atr_len: int = 14
     zone_atr_mult: float = 1.0
     pin_ratio: float = 2.5
@@ -266,6 +322,13 @@ def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
         np.isfinite(out["zone_top"]) & np.isfinite(out["zone_bot"]) & (out["close"] >= out["zone_bot"]) & (out["close"] <= out["zone_top"])
     ).astype(np.int8)
 
+    # Demand zone around last swing low (ATR-buffered)
+    out["demand_top"] = out["last_swing_low"] + zone_buf
+    out["demand_bot"] = out["last_swing_low"] - zone_buf
+    out["in_demand_zone"] = (
+        np.isfinite(out["demand_top"]) & np.isfinite(out["demand_bot"]) & (out["close"] >= out["demand_bot"]) & (out["close"] <= out["demand_top"])
+    ).astype(np.int8)
+
     # Liquidity sweep (simple): wick breaks last pivot high then closes back below (bearish sweep)
     last_pivot_high = np.full(len(out), np.nan)
     cur = np.nan
@@ -278,12 +341,31 @@ def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
         np.isfinite(out["last_pivot_high"]) & (out["high"] > out["last_pivot_high"]) & (out["close"] < out["last_pivot_high"])
     ).astype(np.int8)
 
-    # FVG (very simple): bearish imbalance when low[i] > high[i-2]
+    last_pivot_low = np.full(len(out), np.nan)
+    cur = np.nan
+    for i in range(len(out)):
+        if np.isfinite(pl[i]):
+            cur = pl[i]
+        last_pivot_low[i] = cur
+    out["last_pivot_low"] = last_pivot_low
+    out["liq_sweep_low"] = (
+        np.isfinite(out["last_pivot_low"]) & (out["low"] < out["last_pivot_low"]) & (out["close"] > out["last_pivot_low"])
+    ).astype(np.int8)
+
+    # FVG (very simple): gap/imbalance proxies
     high_2 = out["high"].shift(2)
-    out["fvg_bear"] = ((out["low"] > high_2).fillna(False)).astype(np.int8)
+    low_2 = out["low"].shift(2)
+    out["fvg_up"] = ((out["low"] > high_2).fillna(False)).astype(np.int8)
+    out["fvg_down"] = ((out["high"] < low_2).fillna(False)).astype(np.int8)
+    # Backwards compatibility (kept name)
+    out["fvg_bear"] = out["fvg_up"]
 
     pats = bearish_patterns(out, pin_ratio=cfg.pin_ratio)
     for k, v in pats.items():
+        out[k] = v
+
+    pats2 = bullish_patterns(out, pin_ratio=cfg.pin_ratio)
+    for k, v in pats2.items():
         out[k] = v
 
     # Rule-based short entry signal (aus deinem Pine abgeleitet)
@@ -292,6 +374,13 @@ def compute_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
         & (out["in_supply_zone"] == 1)
         & (out["bearish_pattern"] == 1)
         & (out["rsi"] < cfg.rsi_threshold)
+    ).astype(np.int8)
+
+    out["rule_long"] = (
+        (out["ms_uptrend"] == 1)
+        & (out["in_demand_zone"] == 1)
+        & (out["bullish_pattern"] == 1)
+        & (out["rsi"] > cfg.rsi_long_threshold)
     ).astype(np.int8)
 
     # Normalize some raw prices into relative features
@@ -313,10 +402,16 @@ DEFAULT_FEATURE_COLUMNS = [
     "ms_last_low_hl",
     "ms_last_low_ll",
     "ms_downtrend",
+    "ms_uptrend",
     "is_downtrend",
+    "in_demand_zone",
     "in_supply_zone",
     "liq_sweep_high",
+    "liq_sweep_low",
     "fvg_bear",
+    "fvg_down",
     "bearish_pattern",
+    "bullish_pattern",
     "rule_short",
+    "rule_long",
 ]

@@ -15,8 +15,15 @@ class RewardConfig:
 
     # Behavior shaping
     overtrade_penalty: float = 0.05
-    rule_bonus: float = 0.10
-    rule_penalty: float = 0.10
+    hold_position_penalty: float = 0.001  # small time-cost per bar while in position
+    invalid_action_penalty: float = 0.02  # e.g. buy while already long
+    flip_penalty: float = 0.02  # closing/flip via opposite action
+
+    rule_bonus: float = 0.10  # action aligned with rule signal
+    rule_penalty: float = 0.10  # action against rule signal
+
+    structure_bonus: float = 0.05  # long in uptrend / short in downtrend
+    structure_penalty: float = 0.05
 
     # Risk shaping
     drawdown_penalty_scale: float = 1.0  # multiplied by current drawdown fraction

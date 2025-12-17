@@ -15,12 +15,18 @@ from .types import StepInfo, Trade, as_float32
 @dataclass(frozen=True)
 class EnvConfig:
     window: int = 64
+    episode_len: int = 512  # truncated after N steps (helps training stability)
+    random_start: bool = True
     initial_balance: float = 10_000.0
     commission_per_trade: float = 1.0  # fixed cost per open/close
     sl_atr_mult: float = 1.0
     rr: float = 2.0
     allow_short: bool = True
     allow_long: bool = True
+    close_on_opposite_action: bool = True  # action opposite -> close/flip
+    include_position_features: bool = True
+    slippage_bps: float = 0.5  # 0.5 bps = 0.005%
+    max_trade_bars: Optional[int] = None  # optional time-stop
 
     # session filter (optional) - hours in 0..23
     session_start_hour: Optional[int] = None
@@ -54,7 +60,7 @@ class TradingEnv(gym.Env):
         self.env_cfg = env_cfg
         self.reward_cfg = reward_cfg
 
-        self._features = self.df[self.feature_columns].to_numpy(np.float32)
+        self._base_features = self.df[self.feature_columns].to_numpy(np.float32)
         self._open = self.df["open"].to_numpy(np.float64)
         self._high = self.df["high"].to_numpy(np.float64)
         self._low = self.df["low"].to_numpy(np.float64)
@@ -62,8 +68,13 @@ class TradingEnv(gym.Env):
         self._atr = self.df.get("atr", pd.Series(np.zeros(len(self.df)))).to_numpy(np.float64)
         self._timestamp = self.df["timestamp"].astype(str).to_numpy() if "timestamp" in self.df.columns else None
         self._rule_short = self.df.get("rule_short", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._rule_long = self.df.get("rule_long", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._ms_uptrend = self.df.get("ms_uptrend", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
+        self._ms_downtrend = self.df.get("ms_downtrend", pd.Series(np.zeros(len(self.df)))).to_numpy(np.int8)
 
-        obs_dim = self._features.shape[1]
+        base_dim = self._base_features.shape[1]
+        dyn_dim = 5 if self.env_cfg.include_position_features else 0
+        obs_dim = base_dim + dyn_dim
         self.observation_space = gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -74,6 +85,8 @@ class TradingEnv(gym.Env):
 
         # State
         self.idx = 0
+        self._ep_start_idx = 0
+        self._ep_steps = 0
         self.position = 0
         self.balance = env_cfg.initial_balance
         self.equity = env_cfg.initial_balance
@@ -105,15 +118,51 @@ class TradingEnv(gym.Env):
         w = self.env_cfg.window
         i = self.idx
         start = max(0, i - w + 1)
-        obs = self._features[start : i + 1]
-        if len(obs) < w:
-            pad = np.zeros((w - len(obs), obs.shape[1]), dtype=np.float32)
-            obs = np.vstack([pad, obs])
+        base = self._base_features[start : i + 1]
+        if len(base) < w:
+            pad = np.zeros((w - len(base), base.shape[1]), dtype=np.float32)
+            base = np.vstack([pad, base])
+
+        if not self.env_cfg.include_position_features:
+            return as_float32(base)
+
+        # Dynamic, trade-aware features (repeated over window)
+        dyn = np.zeros((w, 5), dtype=np.float32)
+        if self.open_trade is not None:
+            t = self.open_trade
+            atr = float(self._atr[i])
+            atr = atr if np.isfinite(atr) and atr > 0 else 1.0
+            px = float(self._close[i])
+            unreal = (px - t.entry_price) * t.direction * t.size
+            dist_sl = (px - t.sl) * t.direction  # positive if moving away from SL
+            dist_tp = (t.tp - px) * t.direction  # positive if TP still ahead
+            time_in_trade = max(0, i - t.entry_idx)
+            time_frac = 0.0
+            if self.env_cfg.max_trade_bars is not None and self.env_cfg.max_trade_bars > 0:
+                time_frac = min(1.0, float(time_in_trade) / float(self.env_cfg.max_trade_bars))
+
+            dyn[:, 0] = float(self.position)
+            dyn[:, 1] = float(unreal / max(self.env_cfg.initial_balance, 1e-9))
+            dyn[:, 2] = float(dist_sl / atr)
+            dyn[:, 3] = float(dist_tp / atr)
+            dyn[:, 4] = float(time_frac)
+
+        obs = np.concatenate([base, dyn], axis=1)
         return as_float32(obs)
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict[str, Any]] = None):
         super().reset(seed=seed)
-        self.idx = max(self.env_cfg.window - 1, 0)
+        n = len(self.df)
+        min_start = max(self.env_cfg.window - 1, 0)
+        max_start = max(min_start, n - 2 - max(1, self.env_cfg.episode_len))
+
+        if self.env_cfg.random_start and max_start > min_start:
+            self.idx = int(self.np_random.integers(min_start, max_start + 1))
+        else:
+            self.idx = min_start
+
+        self._ep_start_idx = self.idx
+        self._ep_steps = 0
         self.position = 0
         self.balance = self.env_cfg.initial_balance
         self.equity = self.env_cfg.initial_balance
@@ -123,8 +172,13 @@ class TradingEnv(gym.Env):
         self._last_equity = self.env_cfg.initial_balance
         return self._get_obs(), {}
 
+    def _slip(self) -> float:
+        return float(self.env_cfg.slippage_bps) / 10_000.0
+
     def _open_position(self, direction: int):
-        entry = float(self._close[self.idx])
+        mid = float(self._close[self.idx])
+        slip = self._slip()
+        entry = mid * (1.0 + slip) if direction == 1 else mid * (1.0 - slip)
         atr = float(self._atr[self.idx])
         risk = max(atr * self.env_cfg.sl_atr_mult, 1e-6)
 
@@ -189,7 +243,9 @@ class TradingEnv(gym.Env):
         # Optional session shaping
         in_session = self._in_session(i)
 
-        # Execute action
+        # Execute action / handle flips
+        did_trade_action = action in (1, 2)
+
         if self.position == 0:
             if action == 1 and self.env_cfg.allow_long:
                 self._open_position(direction=1)
@@ -197,10 +253,32 @@ class TradingEnv(gym.Env):
             elif action == 2 and self.env_cfg.allow_short:
                 self._open_position(direction=-1)
                 reward -= self.reward_cfg.overtrade_penalty
+        else:
+            # invalid action: same direction again
+            if (action == 1 and self.position == 1) or (action == 2 and self.position == -1):
+                reward -= self.reward_cfg.invalid_action_penalty
 
-            # Penalize trading outside session
-            if action in (1, 2) and not in_session:
-                reward -= self.reward_cfg.trade_outside_session_penalty
+            # flip/close on opposite action
+            if self.env_cfg.close_on_opposite_action and self.open_trade is not None:
+                if (action == 1 and self.position == -1) or (action == 2 and self.position == 1):
+                    slip = self._slip()
+                    mid = float(self._close[i])
+                    # worst-case exit
+                    exit_px = mid * (1.0 + slip) if self.position == -1 else mid * (1.0 - slip)
+                    pnl_realized = self._close_position(exit_px, reason="FLIP")
+                    trade_closed = True
+                    reward -= self.reward_cfg.flip_penalty
+                    # open new position in the new direction
+                    if action == 1 and self.env_cfg.allow_long:
+                        self._open_position(direction=1)
+                        reward -= self.reward_cfg.overtrade_penalty
+                    elif action == 2 and self.env_cfg.allow_short:
+                        self._open_position(direction=-1)
+                        reward -= self.reward_cfg.overtrade_penalty
+
+        # Penalize trading outside session
+        if did_trade_action and not in_session and (self.position != 0 or trade_closed):
+            reward -= self.reward_cfg.trade_outside_session_penalty
 
         # Manage open trade: check SL/TP hit on next bar range
         if self.open_trade is not None:
@@ -230,6 +308,15 @@ class TradingEnv(gym.Env):
                 pnl_realized = self._close_position(exit_price, reason="TP")
                 trade_closed = True
                 reward += self.reward_cfg.tp_bonus
+            else:
+                # time stop
+                if self.env_cfg.max_trade_bars is not None:
+                    if (self.idx - t.entry_idx) >= int(self.env_cfg.max_trade_bars):
+                        slip = self._slip()
+                        mid = float(self._close[i])
+                        exit_px = mid * (1.0 + slip) if t.direction == -1 else mid * (1.0 - slip)
+                        pnl_realized = self._close_position(exit_px, reason="TIME")
+                        trade_closed = True
 
         # Mark-to-market equity
         if self.open_trade is not None:
@@ -248,15 +335,32 @@ class TradingEnv(gym.Env):
         # Drawdown shaping
         reward -= drawdown * self.reward_cfg.drawdown_penalty_scale
 
-        # Rule adherence shaping (nur für SHORT Regel aus Pine abgeleitet)
-        rule_signal = int(self._rule_short[i])
+        # Small time-cost while holding a position (reduces infinite holding)
+        if self.open_trade is not None:
+            reward -= self.reward_cfg.hold_position_penalty
+
+        # Rule adherence shaping (LONG + SHORT)
+        rule_short = int(self._rule_short[i])
+        rule_long = int(self._rule_long[i])
+        rule_signal = 0
         if action == 2:
-            reward += self.reward_cfg.rule_bonus if rule_signal == 1 else -self.reward_cfg.rule_penalty
+            rule_signal = rule_short
+            reward += self.reward_cfg.rule_bonus if rule_short == 1 else -self.reward_cfg.rule_penalty
+        elif action == 1:
+            rule_signal = rule_long
+            reward += self.reward_cfg.rule_bonus if rule_long == 1 else -self.reward_cfg.rule_penalty
+
+        # Structure alignment shaping
+        if action == 2:
+            reward += self.reward_cfg.structure_bonus if int(self._ms_downtrend[i]) == 1 else -self.reward_cfg.structure_penalty
+        elif action == 1:
+            reward += self.reward_cfg.structure_bonus if int(self._ms_uptrend[i]) == 1 else -self.reward_cfg.structure_penalty
 
         self._last_equity = self.equity
 
         # Advance time
         self.idx += 1
+        self._ep_steps += 1
 
         info = {
             "step": StepInfo(
@@ -274,10 +378,16 @@ class TradingEnv(gym.Env):
                 trade_closed=bool(trade_closed),
             )
         }
+        info["rule_short"] = rule_short
+        info["rule_long"] = rule_long
 
         # Terminate if bankrupt-ish
         if self.equity <= 0:
             terminated = True
+
+        # Truncate after episode_len
+        if self._ep_steps >= max(1, int(self.env_cfg.episode_len)):
+            truncated = True
 
         return self._get_obs(), float(reward), terminated, truncated, info
 
