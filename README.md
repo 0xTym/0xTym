@@ -4,6 +4,35 @@
 
 ---
 
+## Trading-KI (Reinforcement Learning) – Grundgerüst
+
+Dieses Repo enthält ein lauffähiges RL-Grundgerüst für Trading:
+
+- **Daten**: CSV (OHLCV)
+- **State/Features**: u. a. OHLC-Returns, ATR, RSI, Market-Structure (Pivot-basiert, approx), Liquidity-Sweeps (simple), FVG (simple), Candlestick-Patterns (bearish)
+- **Price Action (wichtig)**: Pivot-basierte Marktstruktur **HH / LH / HL / LL** als Features (inkl. `ms_downtrend`/`ms_uptrend`)
+- **Action Space**: `0=Hold`, `1=Buy/Long`, `2=Sell/Short`
+- **Reward/Punkte**: Equity-Delta + Reward-Shaping (TP/SL, Overtrading, Drawdown, Regel-Bonus)
+
+### Quickstart
+
+```bash
+python3 -m pip install -r requirements.txt
+
+# Smoke-Test (mit Beispiel-CSV)
+python3 scripts/smoke_env.py --csv data/sample.csv --timestamp-col timestamp
+
+# PPO trainieren
+python3 scripts/train_ppo.py --csv data/sample.csv --timestamp-col timestamp --timesteps 200000 --run-dir runs/ppo_run
+
+# Backtest (Trades + Summary CSV)
+python3 scripts/backtest.py --csv data/sample.csv --timestamp-col timestamp --model runs/ppo_run/model.zip --out-dir runs/backtest_run
+```
+
+### CSV-Format
+
+Pflicht-Spalten: `open, high, low, close` (optional: `timestamp`, `volume`).
+
 ## 🚀 About Me
 
 - 💻 **Tech Stack:** PHP (Yii Framework), JavaScript, HTML, CSS, C++, C#, Python
