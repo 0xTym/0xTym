@@ -25,6 +25,14 @@ class RewardConfig:
     structure_bonus: float = 0.05  # long in uptrend / short in downtrend
     structure_penalty: float = 0.05
 
+    # Multi-step setup shaping (Trend -> Consolidation -> Breakout -> Correction/Entry)
+    trend_recognition_bonus: float = 0.02
+    consolidation_wait_bonus: float = 0.05
+    breakout_patience_bonus: float = 0.05  # don't chase; acknowledge breakout as indication
+    correction_entry_bonus: float = 0.20  # enter on correction (in zone + pattern)
+    early_entry_penalty: float = 0.10  # entering before correction
+    chase_breakout_penalty: float = 0.10  # entering on breakout candle
+
     # Risk shaping
     drawdown_penalty_scale: float = 1.0  # multiplied by current drawdown fraction
 
